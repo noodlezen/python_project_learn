@@ -28,9 +28,7 @@ META_DICT = {
 '''程序开始'''
 
 ob = MyBank()
+
 # print ob.regist_account(REGIST_META_ORDER, META_DICT)
 while(1):
     print ob.login_account(LOGIN_META_ORDER, META_DICT)
-# ob.regist_account(REGIST_META_ORDER, META_DICT)
-# ob.load_user(2)
-# ob.display_regist_info(REGIST_META_ORDER)

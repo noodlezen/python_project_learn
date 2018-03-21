@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 #_*_ coding:utf-8 _*_
 
-''''''
-
+'''Bnak类模块'''
 # if __name__ == '__main__':
-# import __init__
+# print 'error'
 
 '''导入模块'''
 import datetime
@@ -16,16 +15,12 @@ from MyDateBase import *
 
 '''定义类'''
 
-class MyBank(object):
+
+class Basic(object):
     def __init__(self):
-        self.user_list = []  # 用户对象列表
-        self.user_dict = {}  # 用户对象字典，key:用户序号，value:用户对象
         self.text_rule = TextRule()
         self.text_proces = TextProces()
         self.mysql = MySQL()
-
-    def __create_user(self, name, genre = None):
-        self.__user = User(name, genre) #创建零时用户对象
 
     def load_user(self, user_name):
         user_dict = self.mysql.xload_user(user_name)
@@ -36,46 +31,58 @@ class MyBank(object):
             status = user_dict['user_status']
             created = user_dict['user_created']
             self.user = User(name, genre, user_id, status, created, user_dict)
-            self.user_list.append(self.user)  # 添加到用户列表
-            self.user_dict[name] = self.user  # 添加到用户字典
             return True
         else:
             return False
 
+    def __input_info(self, keys):
+        self.__input_var = raw_input("请输入%s:  " % keys)
 
-    def delete_user(self, user_ob):
-        self.user_list.remove(user_ob)
-        self.user_dict.pop(user_ob.name)
+    def print_info(self, text, color='0', *args):
+        print self.text_proces.color(text, color, *args)
 
-    def __get_user_ob(self, name):
-        self.__user = self.__user_dict[name]
+    def display_user_info(self, user, meta_list):
+        for meta_name in meta_list:
+            if meta_name == '用户名':
+                print self.text_proces.color(
+                    meta_name + ':' + user.name, 'blue', 'l')
+            else:
+                meta = user.meta_dict.get(meta_name)
+                if meta_name != "用户密码":
+                    print self.text_proces.color(
+                        meta_name + ':' + meta.value, 'blue', 'l')
 
 
-    def __input_regist_info(self, meta):
-        self.__tmp_var = raw_input("请输入%s:  " % meta)
-        if meta == '用户密码':
-            re_tmp_var = raw_input("请再次输入%s:  " % meta)
-            if self.__tmp_var == re_tmp_var:
-                result = self.text_rule.check_meta_value(meta, self.__tmp_var) #调用文本规则检测
+class Regist(Basic, object):
+    def __init__(self):
+        Basic.__init__(self)
+
+    def __add_ghost(self, ghost_name, genre=None):
+        self.__ghost = User(ghost_name, genre)  # 创建零时用户对象
+
+    def __input_info(self, meta_name):
+        self.__input_var = raw_input("请输入%s:  " % meta_name)
+        if meta_name == '用户密码':
+            re_input_var = raw_input("请再次输入%s:  " % meta_name)
+            if self.__input_var == re_input_var:
+                result = self.text_rule.check_meta_value(
+                    meta_name, self.__input_var)  # 调用文本规则检测
                 if result == True:
-                    self.__tmp_var = self.text_proces.encrypt(self.__tmp_var) #给用户密码加密
+                    self.__input_var = self.text_proces.encrypt(
+                        self.__input_var)  # 给用户密码加密
                     return True
                 else:
-                    return result
+                    return result  # 返回错误信息
             else:
                 return '用户密码不一致，请重新输入！'
-        return self.text_rule.check_meta_value(meta, self.__tmp_var) #调用文本规则检测
+        # 不是密码直接调用文本规则检测
+        return self.text_rule.check_meta_value(meta_name, self.__input_var)
 
-    def __input_login_info(self, meta):
-        self.__tmp_var = raw_input("请输入%s:  " % meta)
-        if meta == '用户密码':
-            self.__tmp_var = self.text_proces.encrypt(self.__tmp_var) #给用户密码加密
-
-    def __insert_regist_info(self):
-        if self.__user.insert_datebase(): #插入数据库
-            if self.__user.get_id() != False: #获得数据库ID
-                for meta_ob in self.__user.meta_list:
-                    if not meta_ob.insert_datebase(self.__user.ID): #插入数据库
+    def __insert_datebase(self, user):
+        if user.insert_datebase():  # 插入数据库
+            if user.get_id() != False:  # 获得数据库ID
+                for meta in user.meta_list:
+                    if not meta.insert_datebase(user.ID):  # 插入数据库
                         return False
                 return True
             else:
@@ -83,168 +90,123 @@ class MyBank(object):
         else:
             return False
 
-    def __display_regist_info(self, meta_list):
-        for meta in meta_list:
-            if meta == '用户名':
-                print self.text_proces.color(meta + ':' + self.__user.name, 'blue', 'l')
-            else:
-                meta_ob = self.__user.meta_dict.get(meta)
-                if meta != "用户密码":
-                    print self.text_proces.color(meta_ob.name + ':' + meta_ob.value, 'blue', 'l')
-
-
     def regist_account(self, meta_list, meta_dict):
-        for meta in meta_list:
-            types = meta_dict.get(meta)
+        for meta_name in meta_list:
+            meta_types = meta_dict.get(meta_name)
             while(True):
-                result = self.__input_regist_info(meta) #调用内部输入方法，返回规则检测信息
+                result = self.__input_info(meta_name)  # 调用内部输入方法，返回规则检测信息
                 if result == True:
-                    if meta == '用户名':
-                        self.__create_user(self.__tmp_var)
+                    if meta_name == '用户名':
+                        self.__add_ghost(self.__input_var)
                         break
                     else:
-                        self.__user.add_meta(meta, self.__tmp_var, types)
+                        self.__ghost.add_meta(
+                            meta_name, self.__input_var, meta_types)
                         break
                 else:
                     print self.text_proces.color(result, 'red', 'l')
-        self.__display_regist_info(meta_list) #显示注册信息
+        self.display_user_info(self.__ghost, meta_list)  # 显示注册信息
         print '输入验证码'
         if True:
-            if self.__user.get_id() == False:
-                result = True if self.__insert_regist_info() else False #注册信息插入数据库
+            if self.__ghost.get_id() == False:
+                result = True if self.__insert_datebase(
+                    self.__ghost) else False  # 注册信息插入数据库
             else:
                 print self.text_proces.color('用户名已存在！', 'red', 'l')
                 result = False
         return result
 
 
-    def login_account(self, meta_list, meta_dict):
-        for meta_name in meta_list:
-            types = meta_dict.get(meta_name)
-            self.__input_login_info(meta_name)
-            if meta_name == '用户名':
-                self.__create_user(self.__tmp_var)
+class Login(Basic, object):
+    def __init__(self):
+        Basic.__init__(self)
+
+    def __add_ghost(self, ghost_name, genre=None):
+        self.__ghost = User(ghost_name, genre)  # 创建零时用户对象
+
+    def __input_info(self, meta_name):
+        self.__input_var = raw_input("请输入%s:  " % meta_name)
+        if meta_name == '用户密码':
+            self.__input_var = self.text_proces.encrypt(
+                self.__input_var)  # 给用户密码加密
+
+    def __meta_worng_proces(self, user, toplimit, duration):
+        if not user.meta.load_wrong():  # 从数据库读取错误对象
+            name = '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit - 1)
+            user.meta.add_wrong(name, '登入错误', toplimit, duration)  # 添加属性错误信息
+            user.meta.wrong.insert_datebase()  # 插入数据库
+            return name
+        else:
+            remain_time = user.meta.wrong.check_duration()  # 判断是否过期
+            if remain_time == False:
+                user.meta.wrong.delete_wrong()  # 删除无效错误信息
+                return '%s错误！您还有%d次机会尝试！' % (user.meta.name, user.meta.wrong.toplimit)
             else:
-                self.__user.add_meta(meta_name, self.__tmp_var, types)
+                user.meta.wrong.modify_count(user.meta.wrong.count + 1)  # 累积次数
+                remain_count = user.meta.wrong.check_count()  # 检测剩余次数
+                if remain_count == False:  # 错误次数超出限额
+                    user.meta.wrong.modify_name('账户已锁定！%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (
+                        user.meta.name, int(remain_time / 60)))  # 修改错误信息
+                    user.lock(user.meta.wrong.ID)  # 锁定用户对象
+                    result = user.meta.wrong.name
+                else:
+                    result = '%s错误！您还有%d次机会尝试！' % (
+                        user.meta.name, remain_count)
+                user.meta.wrong.update_datebase()  # 更新属性错误修改信息到数据库
+                user.update_datebase()  # 更新用户修改信息到数据库
+                return result
+
+    def login_account(self, meta_list, meta_dict):
+        result = True
+        for meta_name in meta_list:
+            meta_types = meta_dict.get(meta_name)
+            self.__input_info(meta_name)
+            if meta_name == '用户名':
+                self.__add_ghost(self.__input_var)
+            else:
+                self.__ghost.add_meta(meta_name, self.__input_var, meta_types)
         print '输入验证码'
         if True:
             for meta_name in meta_list:
                 if meta_name == '用户名':
-                    if self.load_user(self.__user.name) == False: #从数据库读取用户
-                        print self.text_proces.color('用户名不存在！', 'red', 'l')
+                    if self.load_user(self.__ghost.name) == False:  # 从数据库读取用户
+                        self.print_info('用户名不存在！', 'red', 'l')
                         return False
-                else:
-                    __meta = self.__user.meta_dict[meta_name] #获取零时用户属性对象
-                    self.user.load_meta(__meta.name) #从数据库读取用户属性
-
-                    if self.user.check_status():
-
-                        if self.user.meta.cmp_value(__meta):
-                            if self.user.meta.load_wrong():
-                                self.user.meta.delete_wrong()
-                            print self.text_proces.color('登入成功！', 'green', 'l')
-                            result = True
-                        else:
-                            result = self.mysql.usermeta_worng_proces(self.user, 3, 1)
-                            if type(result) == str:
-                                print self.text_proces.color(result, 'red', 'l')
-                            result = False
-
                     else:
-                        self.user.meta.load_wrong()
-                        remain_time = self.user.meta.wrong.check_duration()
-                        if remain_time == False:
-                            self.user.meta.delete_wrong()
-                            self.user.unlock()
-                            self.user.update_datebase()
-                            if self.user.meta.cmp_value(__meta):
-                                print self.text_proces.color('登入成功！', 'green', 'l')
-                                result = True
+                        result = self.user.check_status()  # 检测用户状态，返回Ture或错误id
+                        if result != True:
+                            self.user.load_wrong(wrong_id=result)  # 根据id读取错误对象
+                            remain_time = self.user.wrong.check_duration()  # 检测是否过期
+                            if remain_time == False:
+                                self.user.unlock()  # 用户解锁
+                                self.user.update_datebase()  # 用户对象更新数据库
                             else:
-                                result = self.mysql.usermeta_worng_proces(self.user, 3, 1)
-                                if type(result) == str:
-                                    print self.text_proces.color(result, 'red', 'l')
-                                result = False
-                        else:
-                            print self.text_proces.color('账户已锁定！登入%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (self.user.meta.name, int(remain_time / 60)), 'red', 'l')
-                            result = False
-        return result
+                                self.print_info('账户已锁定！请在%d分钟后再次尝试登入！' % int(
+                                    remain_time / 60), 'red', 'l')
+                                return False
+                else:
+                    __meta = self.__ghost.meta_dict[meta_name]  # 获取零时用户属性对象
+                    self.user.load_meta(__meta.name)  # 从数据库读取用户属性
+                    if self.user.meta.cmp_value(__meta):  # 判断是否相等
+                        if self.user.meta.load_wrong():  # 读取是否有无效属性错误记录
+                            self.user.meta.wrong.delete_wrong()  # 删除无效错误记录
+                            # delattr(self.user.meta, 'wrong')
+                        self.print_info('登入成功！', 'green', 'l')
+                        res = True
+                    else:
+                        result = self.__meta_worng_proces(
+                            self.user, 3, 1)  # 调用密码错误处理
+                        if result != False:
+                            self.print_info(result, 'red', 'l')  # 输出错误信息
+                        res = False
+                    result = result and res
+            return result
+        else:
+            self.print_info('验证码错误！请重新输入！', 'red', 'l')
+            return False
 
 
-    def construct_user(self):
-        pass
-
-
-    def display_account_info(self, name):
-        self.__get_user_ob(name)
-        tmp = '用户名:     ' + self.__user.name
-        print self.text_proces.color(tmp, 'blue', 'l')
-        for meta in self.__user.meta_list:
-            if meta.name != "用户密码":
-                tmp = meta.name + ':     ' + meta.value
-                print self.text_proces.color(tmp, 'blue', 'l')
-
-
-'''定义函数'''
-
-
-'''程序开始'''
-# ob = MyBank()
-# ob.load_user('mp4102')
-# print ob.user.name
-# ob.user.load_meta('用户密码')
-# print ob.user.meta.name, ob.user.meta.value, ob.user.meta.user_id
-# ob.__display_regist_info
-# now_time = datetime.datetime.now()
-# name = 'zneglei'
-# genre = 'vip'
-# print genre,type(genre)
-# ob = TextProces()
-# print ob.get_types(name)
-# a = str(type(name))
-# d = a.strip("<>").strip("type ").strip("'")
-# mysql = MySQL()
-# res =  mysql.xload_usermeta(2,'用户密码')
-# print res
-# mysql.update_single('userwrong', 'wrong_count', 1, 'wrong_id', 8)
-# res = mysql.load_user(2)
-# for ss in res:
-    # ss = ss.encode('utf-8') if type(ss) == unicode else ss
-    # print ss, type(ss)
-# print mysql.create_user_table()
-# print mysql.create_usermeta_table()
-# print mysql.create_userwrong_table()
-# print mysql.load_userwrong(2,1)
-# print mysql.load_ulocked_wrong_count(8,11)
-# mysql.create_user_locked_table()
-# print mysql.load_umeta_id(5, '用户密码')
-# print mysql.load_umeta_value(5, '用户密码')
-# created = datetime.datetime.now()
-# sql_cmd = "INSERT INTO usermetas(user_id, umeta_genre, umeta_name, umeta_value, umeta_types, umeta_status, umeta_modify, umeta_created) VALUES (%d, '%s', '%s', '%s', '%s', '%s', %d, '%s')" % (user_id, genre, name, value, types, status, modify, created)
-# sql_cmd = "INSERT INTO usermetas(user_id, umeta_name, umeta_value, umeta_created) VALUES (%d, '%s', '%s', '%s')" % (user_id, genre, name, value, types, status, modify, created)
-# mysql.SQL(sql_cmd)
-# mysql.create_usermeta_table()
-# sql_cmd = "SELECT * FROM users WHERE user_login = '%s'" % name# 查询数据库
-# res = mysql.SQL(sql_cmd)
-# res = mysql.load_user_id('mp4102')
-# print res
-# print mysql.check_user_exist('mp4102')
-
-# mysql.create_datebase('my_ebank')
-# mysql.create_user_table()
-
-# mysql.SQL("INSERT INTO users(user_login, user_genre, user_registered) VALUES ('%s','%s','%s')" % (name, genre, now_time))
-# mysql.SQL("ALTER TABLE users DROP user_id")
-# mysql.SQL("ALTER TABLE users ADD user_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT FIRST, ADD PRIMARY KEY (user_id)")
-# mysql.SQL("ALTER TABLE users AUTO_INCREMENT=2")
-# mysql.SQL("INSERT INTO users(user_login) VALUES ('zl274')")
-# table = 'user'
-# keys = 'user_id'
-# keys_value = 123.2231231
-# terms = 'user_name'
-# terms_value = 4102.123213
-# keys_value = ("'"+keys_value+"'") if type(keys_value) == str else str(keys_value)
-# terms_value = ("'"+terms_value+"'") if type(terms_value) == str else str(terms_value)
-# sql_cmd = "UPDATE %s SET %s = %s WHERE %s = %s" % (table, keys, keys_value, terms, terms_value) #更新错误次数
-# print sql_cmd
-
+class MyBank(Regist, Login, object):
+    def __init__(self):
+        Regist.__init__(self)
+        Login.__init__(self)
