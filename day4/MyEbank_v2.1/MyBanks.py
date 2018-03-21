@@ -28,14 +28,14 @@ class MyBank(object):
         self.__user = User(name, genre) #创建零时用户对象
 
     def load_user(self, user_name):
-        result = self.mysql.load_user(user_name)
-        if result != False:
-            user_id= result[0]
-            name = result[1].encode('utf-8')
-            genre= result[2].encode('utf-8')
-            status = result[3]
-            created = result[4]
-            self.user = User(name, genre, user_id, status, created)
+        user_dict = self.mysql.xload_user(user_name)
+        if user_dict != False:
+            user_id = user_dict['user_id']
+            name = user_dict['user_name']
+            genre = user_dict['user_genre']
+            status = user_dict['user_status']
+            created = user_dict['user_created']
+            self.user = User(name, genre, user_id, status, created, user_dict)
             self.user_list.append(self.user)  # 添加到用户列表
             self.user_dict[name] = self.user  # 添加到用户字典
             return True
@@ -119,39 +119,56 @@ class MyBank(object):
 
 
     def login_account(self, meta_list, meta_dict):
-        for meta in meta_list:
-            types = meta_dict.get(meta)
-            self.__input_login_info(meta)
-            if meta == '用户名':
+        for meta_name in meta_list:
+            types = meta_dict.get(meta_name)
+            self.__input_login_info(meta_name)
+            if meta_name == '用户名':
                 self.__create_user(self.__tmp_var)
             else:
-                self.__user.add_meta(meta, self.__tmp_var, types)
+                self.__user.add_meta(meta_name, self.__tmp_var, types)
         print '输入验证码'
         if True:
-            for meta in meta_list:
-                if meta == '用户名':
+            for meta_name in meta_list:
+                if meta_name == '用户名':
                     if self.load_user(self.__user.name) == False: #从数据库读取用户
                         print self.text_proces.color('用户名不存在！', 'red', 'l')
                         return False
                 else:
-                    meta_ob = self.__user.meta_dict[meta] #获取属性对象
-                    self.user.load_meta(meta_ob.name) #从数据库读取用户属性
-                    if self.user.meta.cmp_value(meta_ob):
-                        print '%s正确！' % meta
-                        # result = self.mysql.check_ulocked_status(self.__user.ID, meta_ob.ID)
-                        # if result == True:
-                            # print self.text_proces.color('登入成功！', 'green', 'l')
-                            # result = True
-                        # else:
-                            # print self.text_proces.color(result , 'red', 'l')
-                            # result = False
-                    else:
-                        print '%s错误！' % meta
-                        result = self.mysql.usermeta_worng_proces(self.user, 3, 10)
-                        if type(result) == str:
-                            print self.text_proces.color(result , 'red', 'l')
+                    __meta = self.__user.meta_dict[meta_name] #获取零时用户属性对象
+                    self.user.load_meta(__meta.name) #从数据库读取用户属性
 
-        # return result
+                    if self.user.check_status():
+
+                        if self.user.meta.cmp_value(__meta):
+                            if self.user.meta.load_wrong():
+                                self.user.meta.delete_wrong()
+                            print self.text_proces.color('登入成功！', 'green', 'l')
+                            result = True
+                        else:
+                            result = self.mysql.usermeta_worng_proces(self.user, 3, 1)
+                            if type(result) == str:
+                                print self.text_proces.color(result, 'red', 'l')
+                            result = False
+
+                    else:
+                        self.user.meta.load_wrong()
+                        remain_time = self.user.meta.wrong.check_duration()
+                        if remain_time == False:
+                            self.user.meta.delete_wrong()
+                            self.user.unlock()
+                            self.user.update_datebase()
+                            if self.user.meta.cmp_value(__meta):
+                                print self.text_proces.color('登入成功！', 'green', 'l')
+                                result = True
+                            else:
+                                result = self.mysql.usermeta_worng_proces(self.user, 3, 1)
+                                if type(result) == str:
+                                    print self.text_proces.color(result, 'red', 'l')
+                                result = False
+                        else:
+                            print self.text_proces.color('账户已锁定！登入%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (self.user.meta.name, int(remain_time / 60)), 'red', 'l')
+                            result = False
+        return result
 
 
     def construct_user(self):
@@ -187,6 +204,9 @@ class MyBank(object):
 # a = str(type(name))
 # d = a.strip("<>").strip("type ").strip("'")
 # mysql = MySQL()
+# res =  mysql.xload_usermeta(2,'用户密码')
+# print res
+# mysql.update_single('userwrong', 'wrong_count', 1, 'wrong_id', 8)
 # res = mysql.load_user(2)
 # for ss in res:
     # ss = ss.encode('utf-8') if type(ss) == unicode else ss
@@ -218,3 +238,13 @@ class MyBank(object):
 # mysql.SQL("ALTER TABLE users ADD user_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT FIRST, ADD PRIMARY KEY (user_id)")
 # mysql.SQL("ALTER TABLE users AUTO_INCREMENT=2")
 # mysql.SQL("INSERT INTO users(user_login) VALUES ('zl274')")
+# table = 'user'
+# keys = 'user_id'
+# keys_value = 123.2231231
+# terms = 'user_name'
+# terms_value = 4102.123213
+# keys_value = ("'"+keys_value+"'") if type(keys_value) == str else str(keys_value)
+# terms_value = ("'"+terms_value+"'") if type(terms_value) == str else str(terms_value)
+# sql_cmd = "UPDATE %s SET %s = %s WHERE %s = %s" % (table, keys, keys_value, terms, terms_value) #更新错误次数
+# print sql_cmd
+

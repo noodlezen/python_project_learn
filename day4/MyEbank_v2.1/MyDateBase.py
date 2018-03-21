@@ -22,7 +22,7 @@ DB_NAME = 'my_ebank'
 
 class MySQL(object):
     def __init__(self):
-        self.text_tools = TextProces()
+        self.text_proces = TextProces()
 
     def __SQL(self, cmd):
         db = MySQLdb.connect(DB_HOST, DB_USERNAME,
@@ -38,13 +38,38 @@ class MySQL(object):
             else:
                 result = True
             text = "MySQL数据库:%s, %s操作: 成功！" % (DB_NAME, sql_cmd)
-            print self.text_tools.color(text, 'green', 'l')
+            print self.text_proces.color(text, 'green', 'l')
 
         except:
             db.rollback()
             result = False
             text = "MySQL数据库:%s, %s操作: 失败！" % (DB_NAME, sql_cmd)
-            print self.text_tools.color(text, 'red', 'l')
+            print self.text_proces.color(text, 'red', 'l')
+        db.close()
+        return result
+
+    def __SELECT(self, cmd):
+        db = MySQLdb.connect(DB_HOST, DB_USERNAME,
+                             DB_PASSWORD, DB_NAME, charset='utf8')
+        cursor = db.cursor()
+        try:
+            cursor.execute(cmd)
+            db.commit()
+            res_value = cursor.fetchall()
+            res_field = cursor.description
+            res_dict = {}
+            for i in range(len(res_field)):
+                value = res_value[0][i].encode('utf-8') if type(res_value[0][i]) == unicode else res_value[0][i]
+                res_dict[res_field[i][0]] = value
+            result =  res_dict
+            text = "MySQL数据库:%s, 获取字段名SELECT操作: 成功！" % DB_NAME
+            print self.text_proces.color(text, 'green', 'l')
+
+        except:
+            db.rollback()
+            result = False
+            text = "MySQL数据库:%s, 获取字段名SELECT操作: 失败！" % DB_NAME
+            print self.text_proces.color(text, 'red', 'l')
         db.close()
         return result
 
@@ -58,11 +83,11 @@ class MySQL(object):
             cursor.execute(sql_cmd)
             result = True
             text = "数据库：%s 创建成功！" % name
-            print self.text_tools.color(text, 'green', 'l')
+            print self.text_proces.color(text, 'green', 'l')
         except:
             result = False
             text = "数据库：%s 创建失败！" % name
-            print self.text_tools.color(text, 'red', 'l')
+            print self.text_proces.color(text, 'red', 'l')
         db.close()
         return result
 
@@ -75,7 +100,7 @@ class MySQL(object):
         return self.__SQL(sql_cmd)
 
     def create_userwrong_table(self):
-        sql_cmd = "CREATE TABLE IF NOT EXISTS userwrong (wrong_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, meta_id BIGINT(20) UNSIGNED NOT NULL, wrong_name LONGTEXT NOT NULL, wrong_genre VARCHAR(255), wrong_count INT(10) UNSIGNED NOT NULL, wrong_toplimit INT(10) UNSIGNED NOT NULL, created DATETIME NOT NULL, expiry_date DATETIME NOT NULL) ENGINE=InnoDB AUTO_INCREMENT=1"
+        sql_cmd = "CREATE TABLE IF NOT EXISTS userwrong (wrong_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, meta_id BIGINT(20) UNSIGNED NOT NULL, wrong_name LONGTEXT NOT NULL, wrong_genre VARCHAR(255), wrong_count INT(10) UNSIGNED NOT NULL, wrong_toplimit INT(10) UNSIGNED NOT NULL, wrong_created DATETIME NOT NULL, wrong_expiry_date DATETIME NOT NULL) ENGINE=InnoDB AUTO_INCREMENT=1"
         return self.__SQL(sql_cmd)
 
 #--------------------插入类--------------------#
@@ -89,34 +114,52 @@ class MySQL(object):
         return self.__SQL(sql_cmd)
 
     def insert_userwrong_table(self, user_id, meta_id, name, genre, count, toplimit, created, expiry_date):
-        sql_cmd = "INSERT INTO userwrong(user_id, meta_id, wrong_name, wrong_genre, wrong_count, wrong_toplimit, created, expiry_date) VALUES (%u, %u, '%s', '%s', %d, %d, '%s', '%s')" % (user_id, meta_id, name, genre, count, toplimit, created, expiry_date)
+        sql_cmd = "INSERT INTO userwrong(user_id, meta_id, wrong_name, wrong_genre, wrong_count, wrong_toplimit, wrong_created, wrong_expiry_date) VALUES (%u, %u, '%s', '%s', %d, %d, '%s', '%s')" % (user_id, meta_id, name, genre, count, toplimit, created, expiry_date)
         return self.__SQL(sql_cmd)
+
 #--------------------读取类--------------------#
+
+
+    def xload_user(self, user_name = None, user_id = None):
+        if user_id == None:
+            sql_cmd = "SELECT * FROM users WHERE user_name = '%s'" % user_name
+        else:
+            sql_cmd = "SELECT * FROM users WHERE user_id = %u" % user_id
+        return self.__SELECT(sql_cmd)
+
+    def xload_usermeta(self, user_id = None, meta_name = None, meta_id = None): #获取数据表值和字段名，以字典返回
+        if meta_id == None:
+            sql_cmd = "SELECT * FROM usermeta WHERE user_id = %u AND meta_name = '%s'" % (user_id, meta_name)
+        else:
+            sql_cmd = "SELECT * FROM usermeta WHERE meta_id = %u" % meta_id
+        return self.__SELECT(sql_cmd)
+
+    def xload_userwrong(self, user_id = None, meta_id = None, wrong_id = None): #获取数据表值和字段名，以字典返回
+        if wrong_id == None:
+            sql_cmd = "SELECT * FROM userwrong WHERE user_id = %u AND meta_id = %u" % (user_id, meta_id)
+        else:
+            sql_cmd = "SELECT * FROM userwrong WHERE wrong_id = %u" % wrong_id
+        return self.__SELECT(sql_cmd)
+
+    def load_usermeta_id(self, user_id, meta_name):
+        sql_cmd = "SELECT meta_id FROM usermeta WHERE user_id = %u AND meta_name = '%s'" % (user_id, meta_name)
+        result = self.__SQL(sql_cmd)
+        return result[0][0] if result else False
 
     def load_user_id(self, user_name):
         sql_cmd = "SELECT user_id FROM users WHERE user_name = '%s'" % user_name
         result = self.__SQL(sql_cmd)
         return result[0][0] if result else False
 
-    def load_user(self, user_name):
-        sql_cmd = "SELECT * FROM users WHERE user_name = '%s'" % user_name
-        result = self.__SQL(sql_cmd)
-        return result[0] if result else False
+    # def load_user(self, user_name):
+        # sql_cmd = "SELECT * FROM users WHERE user_name = '%s'" % user_name
+        # result = self.__SQL(sql_cmd)
+        # return result[0] if result else False
 
-    def load_umeta_id(self, user_id, meta_name):
-        sql_cmd = "SELECT meta_id FROM usermeta WHERE user_id = %u AND meta_name = '%s'" % (user_id, meta_name)
-        result = self.__SQL(sql_cmd)
-        return result[0][0] if result else False
-
-    def load_usermeta(self, user_id, meta_name):
-        sql_cmd = "SELECT * FROM usermeta WHERE user_id = %u AND meta_name = '%s'" % (user_id, meta_name)
-        result = self.__SQL(sql_cmd)
-        return result[0] if result else False
-
-    def load_userwrong(self, user_id, meta_id):
-        sql_cmd = "SELECT * FROM userwrong WHERE user_id = %u AND meta_id = %u" % (user_id, meta_id)
-        result = self.__SQL(sql_cmd)
-        return result[0] if result else False
+    # def load_usermeta(self, user_id, meta_name):
+        # sql_cmd = "SELECT * FROM usermeta WHERE user_id = %u AND meta_name = '%s'" % (user_id, meta_name)
+        # result = self.__SQL(sql_cmd)
+        # return result[0] if result else False
 
     # def load_umeta_value(self, user_id, meta_id):
         # sql_cmd = "SELECT meta_value FROM usermeta WHERE user_id = %u AND meta_id = %u" % (user_id, meta_id)
@@ -128,6 +171,38 @@ class MySQL(object):
         # result = self.__SQL(sql_cmd)
         # return result[0][0] if result else False
 
+
+    def load_field(self, table): #获取数据表字段名，以列表返回
+        db = MySQLdb.connect(DB_HOST, DB_USERNAME,
+                             DB_PASSWORD, DB_NAME, charset='utf8')
+        cursor = db.cursor()
+        sql_cmd = "SELECT * FROM %s" % table
+        try:
+            cursor.execute(sql_cmd)
+            db.commit()
+            result = cursor.description
+            field_name_list = []
+            for field in result:
+                field_name_list.append(field[0])
+            result = field_name_list
+            text = "MySQL数据库:%s, 获取字段名操作: 成功！" % DB_NAME
+            print self.text_proces.color(text, 'green', 'l')
+
+        except:
+            db.rollback()
+            result = False
+            text = "MySQL数据库:%s, 获取字段名操作: 失败！" % DB_NAME
+            print self.text_proces.color(text, 'red', 'l')
+        db.close()
+        return result
+
+#--------------------更新类--------------------#
+
+    def update_single(self, table, keys, keys_value, terms, terms_value):
+        keys_value = ("'"+keys_value+"'") if type(keys_value) == str else str(keys_value)
+        terms_value = ("'"+terms_value+"'") if type(terms_value) == str else str(terms_value)
+        sql_cmd = "UPDATE %s SET %s = %s WHERE %s = %s" % (table, keys, keys_value, terms, terms_value)
+        result = self.__SQL(sql_cmd)
 #--------------------删除类--------------------#
 
     def delete_userwrong(self, wrong_id):
@@ -151,34 +226,53 @@ class MySQL(object):
 
 #--------------------处理类--------------------#
 
-
-
-
 #--------------------类--------------------#
 
     def usermeta_worng_proces(self, user, toplimit, duration):
         if not user.meta.load_wrong(): #从数据库读取错误对象
             name = '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit - 1)
             user.meta.add_wrong(name, '登入错误', toplimit, duration)
-            return name if user.meta.wrong.insert_datebase() else False
+            user.meta.wrong.insert_datebase()
+            result = name
 
         else:
-            user.meta.wrong.add_count() #累积次数
             remain_time = user.meta.wrong.check_duration() #判断是否过期
             if remain_time == False:
-                return '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit) if user.meta.delete_wrong() else False #删除数据库记录和对象
-
+                user.meta.delete_wrong()
+                result = '%s错误！您还有%d次机会尝试！' % (user.meta.name, user.meta.wrong.toplimit)
             else:
+                user.meta.wrong.modify_count(user.meta.wrong.count + 1) #累积次数
                 remain_count = user.meta.wrong.check_count()
                 if remain_count == False: #错误次数超出限额
-                    user.meta.wrong.name = '账户已锁定！登入%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (user.meta.name, int(remain_time / 60))
+                    user.meta.wrong.modify_name('账户已锁定！登入%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (user.meta.name, int(remain_time / 60)))
+                    user.lock(user.meta.wrong.ID)
+                    result = user.meta.wrong.name
                 else:
-                    user.meta.wrong.name = '%s错误！您还有%d次机会尝试！' % (user.meta.name, remain_count)
-                sql_cmd = "UPDATE userwrong SET wrong_count = %u WHERE wrong_id = %u" % (user.meta.wrong.count, user.meta.wrong.ID) #更新错误次数
-                result = self.__SQL(sql_cmd)
-                sql_cmd = "UPDATE userwrong SET wrong_name = '%s' WHERE wrong_id = %u" % (user.meta.wrong.name, user.meta.wrong.ID) #更新理由
-                result = (result & self.__SQL(sql_cmd))
-                return user.meta.wrong.name if result == True else False #更新成功
+                    result = '%s错误！您还有%d次机会尝试！' % (user.meta.name, remain_count)
+                user.meta.wrong.update_datebase()
+                user.update_datebase()
+        return result
+
+    # def usermeta_right_proces(self, user):
+        # if user.meta.load_wrong():
+            # remain_count = user.meta.wrong.check_count()
+            # if remain_count == False: #错误次数超出限额
+                # remain_time = user.meta.wrong.check_duration() #判断是否过期
+                # if remain_time == False:
+                    # user.meta.delete_wrong()
+                    # print self.text_proces.color('登入成功！', 'green', 'l')
+                    # result = True
+                # else:
+                    # print self.text_proces.color('账户已锁定！登入%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (user.meta.name, int(remain_time / 60)), 'red', 'l')
+                    # result = False
+            # else:
+                # user.meta.delete_wrong()
+                # print self.text_proces.color('登入成功！', 'green', 'l')
+                # result = True
+        # else:
+            # print self.text_proces.color('登入成功！', 'green', 'l')
+            # result = True
+        # return result
 
 
 
