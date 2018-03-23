@@ -20,6 +20,7 @@ class Basic(object):
     def __init__(self):
         self.text_rule = TextRule()
         self.text_proces = TextProces()
+        self.validate = Validate()
         self.mysql = MySQL()
 
     def load_user(self, user_name):
@@ -58,7 +59,7 @@ class Regist(Basic, object):
         Basic.__init__(self)
 
     def __add_ghost(self, ghost_name, genre=None):
-        self.__ghost = User(ghost_name, genre)  # 创建零时用户对象
+        self.ghost = User(ghost_name, genre)  # 创建零时用户对象
 
     def __input_info(self, meta_name):
         self.__input_var = raw_input("请输入%s:  " % meta_name)
@@ -100,20 +101,22 @@ class Regist(Basic, object):
                         self.__add_ghost(self.__input_var)
                         break
                     else:
-                        self.__ghost.add_meta(
+                        self.ghost.add_meta(
                             meta_name, self.__input_var, meta_types)
                         break
                 else:
                     print self.text_proces.color(result, 'red', 'l')
-        self.display_user_info(self.__ghost, meta_list)  # 显示注册信息
-        print '输入验证码'
-        if True:
-            if self.__ghost.get_id() == False:
+        self.display_user_info(self.ghost, meta_list)  # 显示注册信息
+        if self.validate.text_validate(): #调用验证码模块
+            if self.ghost.get_id() == False:
                 result = True if self.__insert_datebase(
-                    self.__ghost) else False  # 注册信息插入数据库
+                    self.ghost) else False  # 注册信息插入数据库
             else:
                 print self.text_proces.color('用户名已存在！', 'red', 'l')
                 result = False
+        else:
+            result = False
+        delattr(self, 'ghost')
         return result
 
 
@@ -122,7 +125,7 @@ class Login(Basic, object):
         Basic.__init__(self)
 
     def __add_ghost(self, ghost_name, genre=None):
-        self.__ghost = User(ghost_name, genre)  # 创建零时用户对象
+        self.ghost = User(ghost_name, genre)  # 创建零时用户对象
 
     def __input_info(self, meta_name):
         self.__input_var = raw_input("请输入%s:  " % meta_name)
@@ -139,8 +142,8 @@ class Login(Basic, object):
         else:
             remain_time = user.meta.wrong.check_duration()  # 判断是否过期
             if remain_time == False:
-                user.meta.wrong.delete_wrong()  # 删除无效错误信息
-                return '%s错误！您还有%d次机会尝试！' % (user.meta.name, user.meta.wrong.toplimit)
+                user.meta.delete_wrong()  # 删除无效错误信息
+                return '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit)
             else:
                 user.meta.wrong.modify_count(user.meta.wrong.count + 1)  # 累积次数
                 remain_count = user.meta.wrong.check_count()  # 检测剩余次数
@@ -164,14 +167,14 @@ class Login(Basic, object):
             if meta_name == '用户名':
                 self.__add_ghost(self.__input_var)
             else:
-                self.__ghost.add_meta(meta_name, self.__input_var, meta_types)
-        print '输入验证码'
-        if True:
+                self.ghost.add_meta(meta_name, self.__input_var, meta_types)
+        if self.validate.text_validate(): #调用验证码模块
             for meta_name in meta_list:
                 if meta_name == '用户名':
-                    if self.load_user(self.__ghost.name) == False:  # 从数据库读取用户
+                    if self.load_user(self.ghost.name) == False:  # 从数据库读取用户
                         self.print_info('用户名不存在！', 'red', 'l')
-                        return False
+                        result = False
+                        break
                     else:
                         result = self.user.check_status()  # 检测用户状态，返回Ture或错误id
                         if result != True:
@@ -183,15 +186,14 @@ class Login(Basic, object):
                             else:
                                 self.print_info('账户已锁定！请在%d分钟后再次尝试登入！' % int(
                                     remain_time / 60), 'red', 'l')
-                                return False
+                                result = False
+                                break
                 else:
-                    __meta = self.__ghost.meta_dict[meta_name]  # 获取零时用户属性对象
+                    __meta = self.ghost.meta_dict[meta_name]  # 获取零时用户属性对象
                     self.user.load_meta(__meta.name)  # 从数据库读取用户属性
                     if self.user.meta.cmp_value(__meta):  # 判断是否相等
                         if self.user.meta.load_wrong():  # 读取是否有无效属性错误记录
-                            self.user.meta.wrong.delete_wrong()  # 删除无效错误记录
-                            # delattr(self.user.meta, 'wrong')
-                        self.print_info('登入成功！', 'green', 'l')
+                            self.user.meta.delete_wrong()  # 删除无效错误记录
                         res = True
                     else:
                         result = self.__meta_worng_proces(
@@ -200,10 +202,12 @@ class Login(Basic, object):
                             self.print_info(result, 'red', 'l')  # 输出错误信息
                         res = False
                     result = result and res
-            return result
+                    if result == True:
+                        self.print_info('登入成功！', 'green', 'l')
         else:
-            self.print_info('验证码错误！请重新输入！', 'red', 'l')
-            return False
+            result = False
+        delattr(self, 'ghost')
+        return result
 
 
 class MyBank(Regist, Login, object):

@@ -32,3 +32,4 @@ ob = MyBank()
 # print ob.regist_account(REGIST_META_ORDER, META_DICT)
 while(1):
     print ob.login_account(LOGIN_META_ORDER, META_DICT)
+    # print ob.user.meta.wrong

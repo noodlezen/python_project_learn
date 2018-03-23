@@ -61,8 +61,6 @@ class Wrong(Basic, object):
         self.count = count
         self.wrong_dict = wrong_dict
 
-    def delete_wrong(self):
-        return self.mysql.delete_userwrong(self.ID)
 
     def check_duration(self):
         nowtime = datetime.datetime.now()
@@ -111,6 +109,11 @@ class Meta(Basic, object):
 
     def load_wrong(self, wrong_id=None):
         return Basic.load_wrong(self, self.user_id, self.ID, wrong_id)
+
+    def delete_wrong(self):
+        self.mysql.delete_userwrong(self.wrong.ID)
+        delattr(self, 'wrong')
+
 
     def get_id(self, user_id):
         self.ID = self.mysql.load_usermeta_id(user_id, self.name)
@@ -170,12 +173,12 @@ class User(Basic, object):
         else:
             return False
 
-    def add_wrong(self, name, genre, toplimit, duration, meta_id=0):
-        Basic.add_wrong(self, name, genre, toplimit,
-                        duration, self.ID, meta_id)
+    # def add_wrong(self, name, genre, toplimit, duration, meta_id=0):
+        # Basic.add_wrong(self, name, genre, toplimit,
+                        # duration, self.ID, meta_id)
 
-    def load_wrong(self, meta_id=0, wrong_id=None):
-        return Basic.load_wrong(self, self.ID, meta_id, wrong_id)
+    # def load_wrong(self, meta_id=0, wrong_id=None):
+        # return Basic.load_wrong(self, self.ID, meta_id, wrong_id)
 
     def lock(self, wrong_id):
         self.modify_status(wrong_id)
