@@ -46,6 +46,7 @@ class MyBanks(object):
 
 
 bank = MyBanks()
+# bank.mysql.create_user_table()
 # bank.load_user('mp4102')
 # ob = UserMeta(user_id=2)
 # ob.load()
@@ -55,8 +56,9 @@ bank = MyBanks()
 # bank.add_user('mp4102')
 user = User()
 # print user.__class__.__dict__
-# user.regist_account()
-# user.save()
+user.regist()
+user.display()
+user.save()
 # bank.user.save()
 # bank.user.load()
 # bank.user.display()
