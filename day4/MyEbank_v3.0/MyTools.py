@@ -51,13 +51,13 @@ class TextProces(object):
             ';' + back_color + 'm' + text + '\033[0m'
         return result
 
-    def encrypt(self, text):
+    def md5_encrypt(self, text):
         ob = md5.new()
         ob.update(text.encode("utf-8"))
         return ob.hexdigest()
 
-    def get_types(self, text):
-        return str(type(text)).strip("<>").strip("type ").strip("'")
+    # def get_types(self, text):
+        # return str(type(text)).strip("<>").strip("type ").strip("'")
 
 
 class TextRule(object):

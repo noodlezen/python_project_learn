@@ -12,58 +12,47 @@
 import datetime
 import re
 import md5
+import json
 from MyDateBase import *
+from MyTools import *
 from functools import wraps
 
 '''装饰器'''
-def field_option(func):
-    # name: {name_cn, re_input, text_rule, encrypt}
-    regist_option = {
-            'user_name': {'name_cn': '用户名', 're_input': False, 'text_rule':('[a-zA-Z][a-zA-Z0-9_]{4,15}$', '必须以字母开头，允许大小写字母，数字，下划线组合，长度5-16字节。'), 'encrypt': False},
-            'user_password': {'name_cn': '用户密码', 're_input': True, 'text_rule': ('^(?=.*\d).{8,20}$', '必须以数字的组合，允许大小写字母，特殊字符。长度8-20字节。'), 'encrypt': True},
-            'user_email': {'name_cn': '用户邮箱', 're_input': False, 'text_rule': ('^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$', '格式不合法！(xxxxxx@xxx.xx)'), 'encrypt': False},
-            'user_nicename': {'name_cn': '用户昵名', 're_input': False, 'text_rule': False , 'encrypt': False}
-            }
 
-    login_option = {
-            'user_name': {'name_cn': '用户名', 're_input': False, 'text_rule': False , 'encrypt': False},
-            'user_password': {'name_cn': '用户密码', 're_input': False, 'text_rule': False , 'encrypt': True}
-            }
+def load_option(func):
     @wraps(func)
-    def inner(self, name, types, str_symbol, set_regist, set_login):
-        # print func.__name__
-        self.regist_option = set_regist
-        self.login_option = set_login
-        if self.regist_option:
-            self.regist_option = regist_option[name]
-        if self.login_option:
-            self.login_option = login_option[name]
-        func(self, name, types, str_symbol, set_regist, set_login)
+    def inner(self, *args, **kw):
+        print 'Load option ---> %s' % func.__name__
+        option = Options(name=func.__name__)
+        if option.load():
+            if option.autoload == 'yes':
+                return func(self, option.value)
+            else:
+                return func(self, None)
+        else:
+            return False
     return inner
-
 
 def sql_proces(func): #sql命令预处理装饰器
     @wraps(func)
-    def inner(*args, **kw):
+    def inner(self, *args, **kw):
         field_names = [] # 数据库列名
         column_types = [] # 数据库列数据类型
         params = [] # 字符格式化符号参数
+        indexs = [] # 数据库索引
         names = [] # 实例属性名
         values = [] #实例属性值
-        for items in args:
-            if isinstance(items, object): #获取self
-                my_instance = items # 元类定义的实例，比如User类
-        for k, v in my_instance.__mappings__.items(): # 在所有映射中迭代,k是类属性名，v是类属性值
-            # if hasattr(v, 'pattern'):
-                # print k, v.pattern, v.explain
+        for k in self.attr_order: #按顺序取类属性名
+            v = self.__mappings__[k]
+        # for k, v in self.__mappings__.items(): # 在所有映射中迭代,k是类属性名，v是类属性值
             field_names.append(v.name)
             column_types.append(v.types)
             params.append(v.str_symbol)
+            indexs.append(v.index)
             names.append(k) # 类属性名同于实例属性名
-            values.append(getattr(my_instance, k, None)) # 以类属性名,获取实例属性值。无定义类属性的实例属性的值设置为None
-        func(my_instance, field_names, column_types, params, names, values)
+            values.append(getattr(self, k, None)) # 以类属性名,获取实例属性值。无定义类属性的实例属性的值设置为None
+        return func(self, field_names, column_types, params, indexs, names, values)
     return inner
-
 
 def singleton(cls): #单例装饰器
     instances = {}
@@ -85,13 +74,13 @@ def singleton(cls): #单例装饰器
 class Field(object):
     _instance_count = 0
 
-    @field_option
-    def __init__(self, name, types, str_symbol, regist=False, login=False):  # 列名，列类型
+    def __init__(self, name, types, str_symbol, index):  # 列名，列类型, 格式化字符，索引
         Field._instance_count += 1
         self.order = Field._instance_count #记录属性序号
         self.name = name
         self.types = types
         self.str_symbol = str_symbol
+        self.index = index
 
     def __str__(self):
         return "<%s:%s>" % (self.__class__.__name__, self. name)
@@ -130,33 +119,31 @@ class Field(object):
 
 
 class StringField(Field):
-    def __init__(self, name, display_width=255, regist=False, login=False):
-        super(StringField, self).__init__(name, 'VARCHAR(%d)' % display_width, "'%s'", regist, login)
+    def __init__(self, name, display_width=255, index=None):
+        super(StringField, self).__init__(name, 'VARCHAR(%d)' % display_width, "'%s'", index)
 
 class LongTextField(Field):
-    def __init__(self, name, regist=False, login=False):
-        super(LongTextField, self).__init__(name, "LONGTEXT", "'%s'", regist, login)
+    def __init__(self, name, index=None):
+        super(LongTextField, self).__init__(name, "LONGTEXT", "'%s'", index)
 
 class IntField(Field):
-    def __init__(self, name, display_width=11, regist=False, login=False):
-        super(IntField, self).__init__(name, 'INT(%d)' % display_width, '%d', regist, login)
+    def __init__(self, name, display_width=11, index=None):
+        super(IntField, self).__init__(name, 'INT(%d)' % display_width, '%d', index)
 
 class IntegerField(Field):
-    def __init__(self, name, display_width=20, regist=False, login=False):
-        super(IntegerField, self).__init__(name, 'BIGINT(%d)' % display_width, '%u', regist, login)
+    def __init__(self, name, display_width=20, index=None):
+        super(IntegerField, self).__init__(name, 'BIGINT(%d)' % display_width, '%u', index)
 
 class DateTimeField(Field):
-    def __init__(self, name, regist=False, login=False):
-        super(DateTimeField, self).__init__(name, "DATETIME", "'%s'", regist, login)
+    def __init__(self, name, index=None):
+        super(DateTimeField, self).__init__(name, "DATETIME", "'%s'", index)
 
 
-# 编写ModelMetaclass
-class ModelMetaclass(type):
+class ModelMetaclass(type): # 编写ModelMetaclass
 
     def __new__(cls, name, bases, attrs):
-        if name == "Model":
+        if name == "Model": # 如果说新创建的类的名字是Model，那直接返回不做修改
             return type.__new__(cls, name, bases, attrs)
-        # 如果说新创建的类的名字是Model，那直接返回不做修改
         print("Found model:%s" % name)
         mappings = dict()
         for k, v in attrs.items():
@@ -183,6 +170,7 @@ class Model(dict):
     def __init__(self,  **kw):
         super(Model, self).__init__(**kw) # 调用父类，即dict的初始化方法
         self.mysql = MySQL()
+        self.validate = Validate()
         self.__class_attr_order()
 
     def __getattr__(self, key): # 让获取key的值不仅仅可以d[k]，也可以d.k
@@ -204,30 +192,34 @@ class Model(dict):
 
 
     @sql_proces
-    def save(self, field_names, column_types, params, names, values):
+    def save(self, field_names, column_types, params, indexs, names, values):
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (self.__table__, ",".join(field_names), ",".join(params))
         for i in range(len(values)):
             if values[i] == None and params[i] != "'%s'":
                 values[i] = 0
         sql = sql % tuple(values)
-        # self.mysql.SQL(sql)
+        self.mysql.SQL(sql)
         print("SQL: %s" % sql)
 
 
     @sql_proces
-    def load(self, field_names, column_types, params, names, values):
-        key_values = []
-        key_params = []
+    def load(self, field_names, column_types, params, indexs, names, values):
+        index_values = []
+        index_params = []
         for i in range(len(values)):
-            if values[i] != None and type(values[i]) != datetime.datetime:
-                key_values.append(getattr(self, names[i]))
-                key_params.append("%s = %s" % (field_names[i], params[i]))
-        sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(key_params))
-        for i in range(len(key_values)):
-            if values[i] == None and params[i] != "'%s'":
-                values[i] = 0
+            if indexs[i] != None and values[i] != None:
+                if indexs[i] == 'PRIMARY KEY' or indexs[i] == 'UNIQUE':
+                    index_values = []
+                    index_params = []
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+                    break
+                else:
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+        sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(index_params))
         print("SQL: %s" % sql)
-        sql = sql % tuple(key_values)
+        sql = sql % tuple(index_values)
         result = self.mysql.SELECT(sql)
         if result is not False:
             for i in range(len(names)):
@@ -237,48 +229,78 @@ class Model(dict):
             return False
 
     @sql_proces
-    def display(self, field_names, column_types, params, names, values):
+    def display(self, field_names, column_types, params, indexs, names, values):
         for name in names:
             print name, getattr(self, name)
 
 
-    def regist(self):
-        for k in self.attr_order: #按顺序取类属性名
-            v = self.__mappings__[k]
-            if v.regist_option is not False:
-                while(True):
-                    result = v.input_value(v.regist_option['name_cn'], v.regist_option['re_input'])
-                    if result is True:
-                        result = v.check_textrule(v.value, v.regist_option['text_rule'])
-                        if result is True:
-                            if v.regist_option['encrypt']:
-                                v.value = v.md5_encrypt(v.value)
-                            break
-                        else:
-                            print result
-                    else:
-                        print result
-            if isinstance(v, DateTimeField):
-                setattr(self, k, datetime.datetime.now())
-            else:
-                setattr(self, k, getattr(v, 'value', None))
 
+class Options(Model):
+    ID = IntegerField("option_id", index='PRIMARY KEY')
+    name = StringField("option_name", index='INDEX')
+    value = LongTextField("option_value")
+    autoload = StringField("autoload")
+
+    def set(self, name, value, autoload):
+        self.name = name
+        self.value = value
+        self.autoload = autoload
+
+    @sql_proces
+    def save(self, field_names, column_types, params, indexs, names, values):
+        sql = "INSERT INTO %s (%s) VALUES (%s)" % (self.__table__, ",".join(field_names), ",".join(params))
+        for i in range(len(values)):
+            if values[i] == None and params[i] != "'%s'":
+                values[i] = 0
+            elif type(values[i]) is dict or type(values[i]) is list or type(values[i]) is tuple:
+                values[i] = json.dumps(values[i]).replace('\\','\\\\') #填充\\以防mysql吃掉
+        sql = sql % tuple(values)
+        print("SQL: %s" % sql)
+        self.mysql.SQL(sql)
+
+    @sql_proces
+    def load(self, field_names, column_types, params, indexs, names, values):
+        index_values = []
+        index_params = []
+        for i in range(len(values)):
+            if indexs[i] != None and values[i] != None:
+                if indexs[i] == 'PRIMARY KEY' or indexs[i] == 'UNIQUE':
+                    index_values = []
+                    index_params = []
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+                    break
+                else:
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+        sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(index_params))
+        print("SQL: %s" % sql)
+        sql = sql % tuple(index_values)
+        result = self.mysql.SELECT(sql)
+        if result is not False:
+            for i in range(len(names)):
+                if names[i] is 'value': # 还原json数据，并调用递归转码到utf-8
+                    result[field_names[i]] = array_encode(json.loads(result[field_names[i]]))
+                setattr(self, names[i], result[field_names[i]])
+            return True
+        else:
+            return False
 
 
 class UserMeta(Model):
-    ID = IntegerField("umeta_id")
-    user_id = IntegerField("user_id")
-    name = StringField("umeta_name")
+    ID = IntegerField("umeta_id", index='PRIMARY KEY')
+    user_id = IntegerField("user_id", index='INDEX')
+    name = StringField("umeta_name", index='INDEX')
     value = LongTextField("umeta_value")
     created = DateTimeField('umeta_created')
 
 @singleton
 class User(Model):
-    ID = IntegerField("user_id")
-    name = StringField("user_name", regist=True, login=True)
-    password = StringField("user_password", regist=True, login=True)
-    email = StringField("user_email", regist=True)
-    nicename = StringField("user_nicename", regist=True)
+    ID = IntegerField("user_id", index='PRIMARY KEY')
+    name = StringField("user_name", index='UNIQUE')
+    password = StringField("user_password")
+    email = StringField("user_email", index='UNIQUE')
+    nicename = StringField("user_nicename", index='UNIQUE')
     status = IntField("user_status")
     created = DateTimeField('user_created')
 
@@ -286,18 +308,94 @@ class User(Model):
         nowtime = datetime.datetime.now()
         setattr(self, name, UserMeta(user_id=2, name=name, created=nowtime))
 
+    @load_option
+    def user_regist(self, option):
+        for k in self.attr_order: #按顺序取类属性名
+            v = self.__mappings__[k]
+            if option != None:
+                if v.name in option.iterkeys():
+                    while(True):
+                        result = v.input_value(option[v.name]['name_cn'], option[v.name]['re_input'])
+                        if result is True:
+                            result = v.check_textrule(v.value, option[v.name]['text_rule'])
+                            if result is True:
+                                if option[v.name]['encrypt']:
+                                    v.value = v.md5_encrypt(v.value)
+                                break
+                            else:
+                                print result
+                        else:
+                            print result
+            if isinstance(v, DateTimeField):
+                setattr(self, k, datetime.datetime.now())
+            else:
+                setattr(self, k, getattr(v, 'value', None))
+        self.display()
+        if self.validate.text_validate():
+            if self.load():
+                print '用户名已存在！'
+                result = False
+            else:
+                self.save()
+                print '注册成功！'
+                result = True
+        else:
+            result = False
+        return result
+
+'''定义函数'''
+
+def array_encode(array, code='utf-8'): #递归转换数组字典混合数据
+    if isinstance(array, dict) == True:
+        for k, v in array.items():
+            if type(k) == unicode:
+                array.pop(k)
+                array[k.encode(code)] = v
+            if isinstance(v, dict) == False and isinstance(v, list) == False:
+                if type(v) == unicode:
+                    v = v.encode(code)
+                    array[k] = v
+            else:
+                array[k] = array_encode(v) #带入递归
+
+    elif isinstance(array, list) == True:
+        for i in range(len(array)):
+            if isinstance(array[i], dict) == False and isinstance(array[i], list) == False:
+                if type(array[i]) == unicode:
+                    array[i] = array[i].encode(code)
+            else:
+                array[i] = array_encode(array[i]) #带入递归
+    return array
 
 
+'''程序开始'''
 
-class Option(Model):
-    ID = IntegerField("option_id")
-    name = StringField("option_name")
-    value = LongTextField("option_value")
-    autoload = StringField("autoload")
+user_regist_option = {
+            'user_name': {'name_cn': '用户名', 're_input': False, 'text_rule':['[a-zA-Z][a-zA-Z0-9_]{4,15}$', '必须以字母开头，允许大小写字母，数字，下划线组合，长度5-16字节。'], 'encrypt': False},
+            'user_password': {'name_cn': '用户密码', 're_input': True, 'text_rule': ['^(?=.*\d).{8,20}$', '必须以数字的组合，允许大小写字母，特殊字符。长度8-20字节。'], 'encrypt': True},
+            'user_email': {'name_cn': '用户邮箱', 're_input': False, 'text_rule': ['^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$', '格式不合法！(xxxxxx@xxx.xx)'], 'encrypt': False},
+            'user_nicename': {'name_cn': '用户昵名', 're_input': False, 'text_rule': False , 'encrypt': False}
+            }
 
-# option = Option(name='user_regist', value='asd', autoload='yes')
+user_login_option = {
+        'user_name': {'name_cn': '用户名', 're_input': False, 'text_rule': False , 'encrypt': False},
+        'user_password': {'name_cn': '用户密码', 're_input': False, 'text_rule': False , 'encrypt': True}
+        }
+
+
+# option = Options(name='user_regist')
+
+# ddd = option.load()
+# if ddd == login_option:
+    # print 'yes'
+# elif ddd == regist_option:
+    # print 'yes'
+
+# print '==========================='
+# option.set('user_login', user_login_option, 'yes')
 # option.save()
-
+# option.load()
+# option.display()
 
 
 # 创建一个实例

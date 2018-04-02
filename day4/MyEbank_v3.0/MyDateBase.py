@@ -56,7 +56,6 @@ class MySQL(object):
             cursor.execute(cmd)
             db.commit()
             res_value = cursor.fetchall()
-            print res_value
             res_field = cursor.description
             res_dict = {}
             for i in range(len(res_field)):
@@ -92,16 +91,20 @@ class MySQL(object):
         db.close()
         return result
 
+    def create_options_table(self):
+        sql_cmd = "CREATE TABLE IF NOT EXISTS options (option_id BIGINT(20) UNSIGNED PRIMARY KEY AUTO_INCREMENT, option_name VARCHAR(100) NOT NULL, option_value LONGTEXT NOT NULL, autoload VARCHAR(20) NOT NULL, INDEX option_name(option_name(99))) ENGINE=InnoDB AUTO_INCREMENT=1"
+        return self.SQL(sql_cmd)
+
     def create_user_table(self):
-        sql_cmd = "CREATE TABLE IF NOT EXISTS user (user_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_name VARCHAR(60) NOT NULL, user_password VARCHAR(255) NOT NULL, user_email VARCHAR(100) NOT NULL, user_nicename VARCHAR(100), user_status INT(10) UNSIGNED NOT NULL, user_created DATETIME NOT NULL) ENGINE=InnoDB AUTO_INCREMENT=2"
+        sql_cmd = "CREATE TABLE IF NOT EXISTS user (user_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_name VARCHAR(60) NOT NULL, user_password VARCHAR(255) NOT NULL, user_email VARCHAR(100) NOT NULL, user_nicename VARCHAR(100), user_status INT(10) UNSIGNED NOT NULL, user_created DATETIME NOT NULL, UNIQUE user_name(user_name), UNIQUE user_email(user_email), UNIQUE user_nicename(user_nicename)) ENGINE=InnoDB AUTO_INCREMENT=2"
         return self.SQL(sql_cmd)
 
     def create_usermeta_table(self):
-        sql_cmd = "CREATE TABLE IF NOT EXISTS usermeta (umeta_id BIGINT(20) UNSIGNED PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, umeta_name VARCHAR(100) NOT NULL, umeta_value LONGTEXT NOT NULL, umeta_created DATETIME NOT NULL) ENGINE=InnoDB AUTO_INCREMENT=1"
+        sql_cmd = "CREATE TABLE IF NOT EXISTS usermeta (umeta_id BIGINT(20) UNSIGNED PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, umeta_name VARCHAR(100) NOT NULL, umeta_value LONGTEXT NOT NULL, umeta_created DATETIME NOT NULL, INDEX user_id(user_id), INDEX umeta_name(umeta_name(99))) ENGINE=InnoDB AUTO_INCREMENT=1"
         return self.SQL(sql_cmd)
 
     def create_userwrong_table(self):
-        sql_cmd = "CREATE TABLE IF NOT EXISTS userwrong (wrong_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, wrong_name LONGTEXT NOT NULL, wrong_count INT(10) UNSIGNED NOT NULL, wrong_toplimit INT(10) UNSIGNED NOT NULL, wrong_created DATETIME NOT NULL, wrong_expired DATETIME NOT NULL) ENGINE=InnoDB AUTO_INCREMENT=1"
+        sql_cmd = "CREATE TABLE IF NOT EXISTS userwrong (wrong_id BIGINT(20) PRIMARY KEY AUTO_INCREMENT, user_id BIGINT(20) UNSIGNED NOT NULL, wrong_name VARCHAR(255) NOT NULL, wrong_count INT(10) UNSIGNED NOT NULL, wrong_toplimit INT(10) UNSIGNED NOT NULL, wrong_created DATETIME NOT NULL, wrong_expired DATETIME NOT NULL, INDEX user_id(user_id), INDEX wrong_name(wrong_name(191))) ENGINE=InnoDB AUTO_INCREMENT=1"
         return self.SQL(sql_cmd)
 
 

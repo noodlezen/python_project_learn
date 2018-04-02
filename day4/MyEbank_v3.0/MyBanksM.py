@@ -47,6 +47,7 @@ class MyBanks(object):
 
 bank = MyBanks()
 # bank.mysql.create_user_table()
+# bank.mysql.create_options_table()
 # bank.load_user('mp4102')
 # ob = UserMeta(user_id=2)
 # ob.load()
@@ -55,10 +56,13 @@ bank = MyBanks()
 
 # bank.add_user('mp4102')
 user = User()
+# user.load()
 # print user.__class__.__dict__
-user.regist()
-user.display()
-user.save()
+user.user_regist()
+# user.save()
+# user.display()
+# user.load()
+# user.display()
 # bank.user.save()
 # bank.user.load()
 # bank.user.display()
@@ -165,16 +169,16 @@ class Regist(Basic, object):
                         # break
                 # else:
                     # print self.text_proces.color(result, 'red', 'l')
-        # self.display_user_info(self.ghost, meta_list)  # 显示注册信息
-        # if self.validate.text_validate(): #调用验证码模块
-            # if self.ghost.get_id() == False:
-                # result = True if self.__insert_datebase(
-                    # self.ghost) else False  # 注册信息插入数据库
-            # else:
-                # print self.text_proces.color('用户名已存在！', 'red', 'l')
-                # result = False
-        # else:
-            # result = False
+        self.display_user_info(self.ghost, meta_list)  # 显示注册信息
+        if self.validate.text_validate(): #调用验证码模块
+            if self.ghost.get_id() == False:
+                result = True if self.__insert_datebase(
+                    self.ghost) else False  # 注册信息插入数据库
+            else:
+                print self.text_proces.color('用户名已存在！', 'red', 'l')
+                result = False
+        else:
+            result = False
         # delattr(self, 'ghost')
         # return result
 
