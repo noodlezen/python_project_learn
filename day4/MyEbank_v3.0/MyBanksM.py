@@ -46,6 +46,8 @@ class MyBanks(object):
 
 
 bank = MyBanks()
+# sql = "SELECT user_name FROM user WHERE user_name = 'mp4102'"
+# print bank.mysql.SELECT(sql)
 # bank.mysql.create_user_table()
 # bank.mysql.create_options_table()
 # bank.load_user('mp4102')
@@ -55,26 +57,47 @@ bank = MyBanks()
 
 
 # bank.add_user('mp4102')
-user = User()
+user = User(name='mp4102')
+# user.update_one('user_status', 1)
 # user.load()
+# print user.get_one('user_password')
 # print user.__class__.__dict__
-user.user_regist()
-# user.save()
+# print user.user_regist()
 # user.display()
+# user.password = 'zl274'
+# user.save()
 # user.load()
 # user.display()
-# bank.user.save()
-# bank.user.load()
-# bank.user.display()
-# bank.user.add_meta('age')
-# bank.user.age.save()
-# bank.user.age.load()
-# bank.user.age.display()
-# bank.user.add_meta('phone')
-# print bank.user is bank.ghost
-# print bank.user.age is bank.user.phone
-# print bank.user.phone
-# bank.user.display()
+# user = User(name='mp4102')
+# print user.load_primary()
+# print user.get_one('user_id')
+while(1): # print user.ID
+    user.user_login()
+# print user.ID
+# user.get_wrong_array()
+# print user.wrong_list
+# print user.keys()
+# print type(user['user_password_wrong'])
+
+
+# class test_1(object):
+    # def __init__(self, b):
+        # self.a = 1
+        # self.b = b
+        # print self.a, self.b
+
+    # def ddd(self, name):
+        # setattr(self, name, 5)
+        # delattr(self, name)
+
+# ob = test_1(2)
+# setattr(ob, 'c', 3)
+# print ob.c
+# setattr(ob, 'c', 4)
+# print ob.c
+# delattr(ob, 'c')
+# ob.ddd('c')
+# print ob.c
 
 
 
@@ -183,94 +206,94 @@ class Regist(Basic, object):
         # return result
 
 
-# class Login(Basic, object):
-    # def __init__(self):
-        # Basic.__init__(self)
+class Login(Basic, object):
+    def __init__(self):
+        Basic.__init__(self)
 
-    # def __add_ghost(self, ghost_name, genre=None):
-        # self.ghost = User(ghost_name, genre)  # 创建零时用户对象
+    def __add_ghost(self, ghost_name, genre=None):
+        self.ghost = User(ghost_name, genre)  # 创建零时用户对象
 
-    # def __input_info(self, meta_name):
-        # self.__input_var = raw_input("请输入%s:  " % meta_name)
-        # if meta_name == '用户密码':
-            # self.__input_var = self.text_proces.encrypt(
-                # self.__input_var)  # 给用户密码加密
+    def __input_info(self, meta_name):
+        self.__input_var = raw_input("请输入%s:  " % meta_name)
+        if meta_name == '用户密码':
+            self.__input_var = self.text_proces.encrypt(
+                self.__input_var)  # 给用户密码加密
 
-    # def __meta_worng_proces(self, user, toplimit, duration):
-        # if not user.meta.load_wrong():  # 从数据库读取错误对象
-            # name = '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit - 1)
-            # user.meta.add_wrong(name, '登入错误', toplimit, duration)  # 添加属性错误信息
-            # user.meta.wrong.insert_datebase()  # 插入数据库
-            # return name
-        # else:
-            # remain_time = user.meta.wrong.check_duration()  # 判断是否过期
-            # if remain_time == False:
-                # user.meta.delete_wrong()  # 删除无效错误信息
-                # return '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit)
-            # else:
-                # user.meta.wrong.modify_count(user.meta.wrong.count + 1)  # 累积次数
-                # remain_count = user.meta.wrong.check_count()  # 检测剩余次数
-                # if remain_count == False:  # 错误次数超出限额
-                    # user.meta.wrong.modify_name('账户已锁定！%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (
-                        # user.meta.name, int(remain_time / 60)))  # 修改错误信息
-                    # user.lock(user.meta.wrong.ID)  # 锁定用户对象
-                    # result = user.meta.wrong.name
-                # else:
-                    # result = '%s错误！您还有%d次机会尝试！' % (
-                        # user.meta.name, remain_count)
-                # user.meta.wrong.update_datebase()  # 更新属性错误修改信息到数据库
-                # user.update_datebase()  # 更新用户修改信息到数据库
-                # return result
+    def __meta_worng_proces(self, user, toplimit, duration):
+        if not user.meta.load_wrong():  # 从数据库读取错误对象
+            name = '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit - 1)
+            user.meta.add_wrong(name, '登入错误', toplimit, duration)  # 添加属性错误信息
+            user.meta.wrong.insert_datebase()  # 插入数据库
+            return name
+        else:
+            remain_time = user.meta.wrong.check_duration()  # 判断是否过期
+            if remain_time == False:
+                user.meta.delete_wrong()  # 删除无效错误信息
+                return '%s错误！您还有%d次机会尝试！' % (user.meta.name, toplimit)
+            else:
+                user.meta.wrong.modify_count(user.meta.wrong.count + 1)  # 累积次数
+                remain_count = user.meta.wrong.check_count()  # 检测剩余次数
+                if remain_count == False:  # 错误次数超出限额
+                    user.meta.wrong.modify_name('账户已锁定！%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (
+                        user.meta.name, int(remain_time / 60)))  # 修改错误信息
+                    user.lock(user.meta.wrong.ID)  # 锁定用户对象
+                    result = user.meta.wrong.name
+                else:
+                    result = '%s错误！您还有%d次机会尝试！' % (
+                        user.meta.name, remain_count)
+                user.meta.wrong.update_datebase()  # 更新属性错误修改信息到数据库
+                user.update_datebase()  # 更新用户修改信息到数据库
+                return result
 
-    # def login_account(self, meta_list, meta_dict):
-        # result = True
-        # for meta_name in meta_list:
-            # meta_types = meta_dict.get(meta_name)
-            # self.__input_info(meta_name)
-            # if meta_name == '用户名':
-                # self.__add_ghost(self.__input_var)
-            # else:
-                # self.ghost.add_meta(meta_name, self.__input_var, meta_types)
-        # if self.validate.text_validate(): #调用验证码模块
-            # for meta_name in meta_list:
-                # if meta_name == '用户名':
-                    # if self.load_user(self.ghost.name) == False:  # 从数据库读取用户
-                        # self.print_info('用户名不存在！', 'red', 'l')
-                        # result = False
-                        # break
-                    # else:
-                        # result = self.user.check_status()  # 检测用户状态，返回Ture或错误id
-                        # if result != True:
-                            # self.user.load_wrong(wrong_id=result)  # 根据id读取错误对象
-                            # remain_time = self.user.wrong.check_duration()  # 检测是否过期
-                            # if remain_time == False:
-                                # self.user.unlock()  # 用户解锁
-                                # self.user.update_datebase()  # 用户对象更新数据库
-                            # else:
-                                # self.print_info('账户已锁定！请在%d分钟后再次尝试登入！' % int(
-                                    # remain_time / 60), 'red', 'l')
-                                # result = False
-                                # break
-                # else:
-                    # __meta = self.ghost.meta_dict[meta_name]  # 获取零时用户属性对象
-                    # self.user.load_meta(__meta.name)  # 从数据库读取用户属性
-                    # if self.user.meta.cmp_value(__meta):  # 判断是否相等
-                        # if self.user.meta.load_wrong():  # 读取是否有无效属性错误记录
-                            # self.user.meta.delete_wrong()  # 删除无效错误记录
-                        # res = True
-                    # else:
-                        # result = self.__meta_worng_proces(
-                            # self.user, 3, 1)  # 调用密码错误处理
-                        # if result != False:
-                            # self.print_info(result, 'red', 'l')  # 输出错误信息
-                        # res = False
-                    # result = result and res
-                    # if result == True:
-                        # self.print_info('登入成功！', 'green', 'l')
-        # else:
-            # result = False
-        # delattr(self, 'ghost')
-        # return result
+    def login_account(self, meta_list, meta_dict):
+        result = True
+        for meta_name in meta_list:
+            meta_types = meta_dict.get(meta_name)
+            self.__input_info(meta_name)
+            if meta_name == '用户名':
+                self.__add_ghost(self.__input_var)
+            else:
+                self.ghost.add_meta(meta_name, self.__input_var, meta_types)
+        if self.validate.text_validate(): #调用验证码模块
+            for meta_name in meta_list:
+                if meta_name == '用户名':
+                    if self.load_user(self.ghost.name) == False:  # 从数据库读取用户
+                        self.print_info('用户名不存在！', 'red', 'l')
+                        result = False
+                        break
+                    else:
+                        result = self.user.check_status()  # 检测用户状态，返回Ture或错误id
+                        if result != True:
+                            self.user.load_wrong(wrong_id=result)  # 根据id读取错误对象
+                            remain_time = self.user.wrong.check_duration()  # 检测是否过期
+                            if remain_time == False:
+                                self.user.unlock()  # 用户解锁
+                                self.user.update_datebase()  # 用户对象更新数据库
+                            else:
+                                self.print_info('账户已锁定！请在%d分钟后再次尝试登入！' % int(
+                                    remain_time / 60), 'red', 'l')
+                                result = False
+                                break
+                else:
+                    __meta = self.ghost.meta_dict[meta_name]  # 获取零时用户属性对象
+                    self.user.load_meta(__meta.name)  # 从数据库读取用户属性
+                    if self.user.meta.cmp_value(__meta):  # 判断是否相等
+                        if self.user.meta.load_wrong():  # 读取是否有无效属性错误记录
+                            self.user.meta.delete_wrong()  # 删除无效错误记录
+                        res = True
+                    else:
+                        result = self.__meta_worng_proces(
+                            self.user, 3, 1)  # 调用密码错误处理
+                        if result != False:
+                            self.print_info(result, 'red', 'l')  # 输出错误信息
+                        res = False
+                    result = result and res
+                    if result == True:
+                        self.print_info('登入成功！', 'green', 'l')
+        else:
+            result = False
+        delattr(self, 'ghost')
+        return result
 
 '''
 class Rule(object):

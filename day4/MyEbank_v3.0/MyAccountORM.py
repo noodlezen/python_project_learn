@@ -37,21 +37,32 @@ def sql_proces(func): #sql命令预处理装饰器
     @wraps(func)
     def inner(self, *args, **kw):
         field_names = [] # 数据库列名
-        column_types = [] # 数据库列数据类型
         params = [] # 字符格式化符号参数
         indexs = [] # 数据库索引
         names = [] # 实例属性名
         values = [] #实例属性值
+        index_values = []
+        index_params = []
         for k in self.attr_order: #按顺序取类属性名
             v = self.__mappings__[k]
-        # for k, v in self.__mappings__.items(): # 在所有映射中迭代,k是类属性名，v是类属性值
             field_names.append(v.name)
-            column_types.append(v.types)
             params.append(v.str_symbol)
             indexs.append(v.index)
             names.append(k) # 类属性名同于实例属性名
             values.append(getattr(self, k, None)) # 以类属性名,获取实例属性值。无定义类属性的实例属性的值设置为None
-        return func(self, field_names, column_types, params, indexs, names, values)
+        for i in range(len(values)):
+            if indexs[i] != None and values[i] != None:
+                if indexs[i] == 'PRIMARY KEY':
+                    index_values = []
+                    index_params = []
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+                    break
+                else:
+                    index_values.append(getattr(self, names[i]))
+                    index_params.append("%s = %s" % (field_names[i], params[i]))
+
+        return func(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw)
     return inner
 
 def singleton(cls): #单例装饰器
@@ -182,6 +193,9 @@ class Model(dict):
     def __setattr__(self, key, value): # 允许动态设置key的值，不仅仅可以d[k]，也可以d.k
         self[key] = value
 
+    # def __delattr__(self, key):
+        # return self.pop(key)
+
     def __class_attr_order(self): #得到类属性顺序序列
         temp = dict()
         self.attr_order = list()
@@ -190,33 +204,36 @@ class Model(dict):
         for i in sorted(temp):
             self.attr_order.append(temp[i])
 
+    @sql_proces
+    def save(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(index_params))
+        sql = sql % tuple(index_values)
+        result = self.mysql.SELECT(sql)
+        if result == False:
+            print '-----insert-----'
+            for i in range(len(values)): # 非字符数据写0
+                if values[i] == None and params[i] != "'%s'":
+                    values[i] = 0
+            sql = "INSERT INTO %s (%s) VALUES (%s)" % (self.__table__, ",".join(field_names), ",".join(params))
+            sql = sql % tuple(values)
+            print("SQL: %s" % sql)
+            return self.mysql.SQL(sql)
+        else:
+            print '-----update-----'
+            for i in range(len(values)):
+                if values[i] != None:
+                    if result[field_names[i]] != self[names[i]]:
+                        up_values = []
+                        up_values.append(self[names[i]])
+                        sql = "UPDATE %s SET %s = %s WHERE %s" % (self.__table__, field_names[i], params[i], " AND ".join(index_params))
+                        up_values.extend(index_values)
+                        sql = sql % tuple(up_values)
+                        print("SQL: %s" % sql)
+                        return self.mysql.SQL(sql)
+
 
     @sql_proces
-    def save(self, field_names, column_types, params, indexs, names, values):
-        sql = "INSERT INTO %s (%s) VALUES (%s)" % (self.__table__, ",".join(field_names), ",".join(params))
-        for i in range(len(values)):
-            if values[i] == None and params[i] != "'%s'":
-                values[i] = 0
-        sql = sql % tuple(values)
-        self.mysql.SQL(sql)
-        print("SQL: %s" % sql)
-
-
-    @sql_proces
-    def load(self, field_names, column_types, params, indexs, names, values):
-        index_values = []
-        index_params = []
-        for i in range(len(values)):
-            if indexs[i] != None and values[i] != None:
-                if indexs[i] == 'PRIMARY KEY' or indexs[i] == 'UNIQUE':
-                    index_values = []
-                    index_params = []
-                    index_values.append(getattr(self, names[i]))
-                    index_params.append("%s = %s" % (field_names[i], params[i]))
-                    break
-                else:
-                    index_values.append(getattr(self, names[i]))
-                    index_params.append("%s = %s" % (field_names[i], params[i]))
+    def load(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
         sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(index_params))
         print("SQL: %s" % sql)
         sql = sql % tuple(index_values)
@@ -228,8 +245,72 @@ class Model(dict):
         else:
             return False
 
+
     @sql_proces
-    def display(self, field_names, column_types, params, indexs, names, values):
+    def delete(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        sql = "DELETE FROM %s WHERE %s" % (self.__table__," AND ".join(index_params))
+        print("SQL: %s" % sql)
+        sql = sql % tuple(index_values)
+        return self.mysql.SQL(sql)
+
+
+    @sql_proces
+    def update_one(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        field_name, value = args[0], args[1] #函数形参
+        up_values = []
+        up_values.append(value)
+        sql = "UPDATE %s SET %s = %s WHERE %s" % (self.__table__, field_name, params[field_names.index(field_name)], " AND ".join(index_params))
+        up_values.extend(index_values)
+        sql = sql % tuple(up_values)
+        print("SQL: %s" % sql)
+        return self.mysql.SQL(sql)
+
+
+    @sql_proces
+    def get_one(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        field_name = args[0] #函数形参
+        sql = "SELECT %s FROM %s WHERE %s" % (field_name, self.__table__," AND ".join(index_params))
+        print("SQL: %s" % sql)
+        sql = sql % tuple(index_values)
+        result = self.mysql.SELECT(sql)
+        if result is not False:
+            return result[field_name]
+        else:
+            return False
+
+
+    @sql_proces
+    def load_primary(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        for i in range(len(values)):
+            if indexs[i] == 'PRIMARY KEY':
+                primary_field_name = field_names[i]
+                primary_name = names[i]
+        sql = "SELECT %s FROM %s WHERE %s" % (primary_field_name, self.__table__," AND ".join(index_params))
+        print("SQL: %s" % sql)
+        sql = sql % tuple(index_values)
+        result = self.mysql.SELECT(sql)
+        if result is not False:
+            setattr(self, primary_name, result[primary_field_name])
+            return True
+        else:
+            return False
+
+
+    @sql_proces
+    def check_unique(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+        for i in range(len(values)):
+            if indexs[i] == 'UNIQUE' and values[i] != None:
+                sql = "SELECT %s FROM %s WHERE %s = %s" % (field_names[i], self.__table__,field_names[i], params[i])
+                sql = sql % values[i]
+                result = self.mysql.SELECT(sql)
+                if result != False:
+                    print '%s已存在！' % field_names[i]
+                    return False
+        return True
+
+
+    @sql_proces
+    def display(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
         for name in names:
             print name, getattr(self, name)
 
@@ -247,7 +328,7 @@ class Options(Model):
         self.autoload = autoload
 
     @sql_proces
-    def save(self, field_names, column_types, params, indexs, names, values):
+    def save(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
         sql = "INSERT INTO %s (%s) VALUES (%s)" % (self.__table__, ",".join(field_names), ",".join(params))
         for i in range(len(values)):
             if values[i] == None and params[i] != "'%s'":
@@ -259,20 +340,8 @@ class Options(Model):
         self.mysql.SQL(sql)
 
     @sql_proces
-    def load(self, field_names, column_types, params, indexs, names, values):
-        index_values = []
-        index_params = []
-        for i in range(len(values)):
-            if indexs[i] != None and values[i] != None:
-                if indexs[i] == 'PRIMARY KEY' or indexs[i] == 'UNIQUE':
-                    index_values = []
-                    index_params = []
-                    index_values.append(getattr(self, names[i]))
-                    index_params.append("%s = %s" % (field_names[i], params[i]))
-                    break
-                else:
-                    index_values.append(getattr(self, names[i]))
-                    index_params.append("%s = %s" % (field_names[i], params[i]))
+    def load(self, field_names, params, indexs, names, values, index_values, index_params, *args, **kw):
+
         sql = "SELECT %s FROM %s WHERE %s" % (",".join(field_names), self.__table__," AND ".join(index_params))
         print("SQL: %s" % sql)
         sql = sql % tuple(index_values)
@@ -294,6 +363,26 @@ class UserMeta(Model):
     value = LongTextField("umeta_value")
     created = DateTimeField('umeta_created')
 
+class UserWrong(Model):
+    ID = IntegerField("wrong_id", index='PRIMARY KEY')
+    user_id = IntegerField("user_id", index='INDEX')
+    name = StringField("wrong_name", index='INDEX')
+    count = IntField("wrong_count")
+    toplimit = IntField("wrong_toplimit")
+    created = DateTimeField('wrong_created')
+    expired = DateTimeField('wrong_expired')
+
+    def check_duration(self):
+        nowtime = datetime.datetime.now()
+        return (self.expired - nowtime).total_seconds() + 10 if nowtime <= self.expired else False
+
+    def check_count(self):
+        return (self.toplimit - self.count) if self.count <= self.toplimit else False
+
+    def count_add(self):
+        self.count += 1
+
+
 @singleton
 class User(Model):
     ID = IntegerField("user_id", index='PRIMARY KEY')
@@ -304,12 +393,58 @@ class User(Model):
     status = IntField("user_status")
     created = DateTimeField('user_created')
 
-    def add_meta(self, name):
-        nowtime = datetime.datetime.now()
-        setattr(self, name, UserMeta(user_id=2, name=name, created=nowtime))
+    wrong_array = []
 
-    @load_option
-    def user_regist(self, option):
+    def add_wrong(self, name, toplimit, duration):
+        nowtime = datetime.datetime.now()
+        expired = nowtime + datetime.timedelta(minutes=duration)
+        self[name] = UserWrong(user_id=self.ID, name=name, count=1, toplimit=toplimit, created=nowtime, expired=expired)
+        self.wrong_array.append(name)
+
+
+    def load_wrong(self, name=None, wrong_id=None):
+        if name!= None and wrong_id == None:
+            if name in self.wrong_array:
+                return self[name].load()
+            else:
+                self[name] = UserWrong(user_id=self.ID, name=name)
+                self.wrong_array.append(name)
+                return self[name].load()
+        elif wrong_id != None:
+            wrong = UserWrong(ID=wrong_id)
+            if wrong.load():
+                name = wrong.name
+                self[name] = wrong
+                return wrong
+            else:
+                return False
+        else:
+            return False
+
+    def delete_wrong(self, name):
+        if name in self.wrong_array:
+            if self[name].delete():
+                self.wrong_array.remove(name)
+                self.pop(name) # 删除属性,等效delattr
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def check_status(self):
+        result = self.get_one('user_status')
+        return True if result == False else result
+
+    def lock(self, wrong_id):
+        self.status = wrong_id
+        self.update_one('user_status', wrong_id)
+
+    def unlock(self):
+        self.status = 0
+        self.update_one('user_status', 0)
+
+    def input_info(self, option):
         for k in self.attr_order: #按顺序取类属性名
             v = self.__mappings__[k]
             if option != None:
@@ -330,18 +465,90 @@ class User(Model):
                 setattr(self, k, datetime.datetime.now())
             else:
                 setattr(self, k, getattr(v, 'value', None))
+
+    @load_option
+    def user_regist(self, option):
+        self.input_info(option)
         self.display()
         if self.validate.text_validate():
-            if self.load():
-                print '用户名已存在！'
-                result = False
+            if self.check_unique():
+                if self.save():
+                    print '注册成功！'
+                    result = True
+                else:
+                    print '注册失败！'
+                    result = False
             else:
-                self.save()
-                print '注册成功！'
-                result = True
+                result = False
         else:
             result = False
         return result
+
+
+    @load_option
+    def user_login(self, option):
+        self.input_info(option)
+        self.display()
+        toplimit = 3
+        duration = 2
+        # if self.validate.text_validate():
+        if True:
+            if self.load_primary(): # 载入主键，user_id
+                res1 = self.check_status()
+                if res1 == True:
+                    for k in self.attr_order: #按顺序取类属性名
+                        v = self.__mappings__[k]
+                        if v.name in option.iterkeys() and option[v.name]['encrypt'] == True:
+                            res2 = self.get_one(v.name)
+                            if self[k] == res2:
+                                print 'right!'
+                                wrong_name = v.name + '_wrong'
+                                if self.load_wrong(wrong_name) == True: #载入错误
+                                    self.delete_wrong(wrong_name) # 删除无效错误信息
+                            else:
+                                wrong_name = v.name + '_wrong'
+                                if self.load_wrong(wrong_name) == False: #载入错误
+                                    self.add_wrong(wrong_name, toplimit, duration) #添加错误
+                                    self[wrong_name].save() # 保存到数据库
+                                    print '%s错误！您还有%d次机会尝试！' % (v.name, toplimit - 1)
+                                else:
+                                    wrong = self[wrong_name]
+                                    # wrong.display()
+                                    remain_time = wrong.check_duration()
+                                    if remain_time == False:
+                                        self.delete_wrong(wrong_name) # 删除无效错误信息
+                                        print '%s错误！您还有%d次机会尝试！' % (v.name, toplimit)
+                                    else:
+                                        wrong.count_add() # 增加错误次数
+                                        remain_count = wrong.check_count()
+                                        if remain_count == False:
+                                            print '账户已锁定！%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (v.name, int(remain_time / 60))
+                                            self.lock(wrong.ID)
+                                        else:
+                                            print '%s错误！您还有%d次机会尝试！' % (v.name, remain_count)
+                                        wrong.save()
+                else:
+                    wrong = self.load_wrong(wrong_id=res1) #载入错误
+                    if isinstance(wrong, UserWrong):
+                        wrong.display()
+                        remain_time = wrong.check_duration()
+                        if remain_time == False: #时间到解除锁定
+                            self.delete_wrong(wrong.name) # 删除无效错误信息
+                            self.unlock()
+                            print '解除锁定，请重新登入'
+                        else:
+                            print '账户已锁定！%s错误次数超过限制,请在%d分钟后再次尝试登入！' % (wrong.name, int(remain_time / 60))
+                    else:
+                        print '有bug'
+
+            else:
+                print '用户不存在！'
+                result = False
+        else:
+            print '验证码错误！'
+            result = False
+
+
 
 '''定义函数'''
 
